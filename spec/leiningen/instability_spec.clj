@@ -13,7 +13,8 @@
         (should (every? :dependency-count table))
         (should (every? :dependent-count table))
         (should (every? :instability table))
-        (should (every? :abstract-maybe? table))))
+        (should (every? :abstract-maybe? table))
+        (should (every? :re-examine table))))
 
     (it "calculates the instability score"
       (let [table (generate-deps-table (create-graph "src") @config)]

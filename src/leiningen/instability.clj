@@ -28,6 +28,13 @@
         code (try (slurp decl-as-file) (catch Exception e ""))]
     (some #(re-find (re-pattern %) code) abstractions)))
 
+(defn- flag-for-re-examine [instability abstractions]
+  (if (and
+        (empty? abstractions)
+        (< instability 0.3))
+    "X"
+    ""))
+
 (defn- filter-ns-decls [ns-syms library]
   (filter #(re-find (re-pattern library) (str %)) ns-syms))
 
@@ -99,7 +106,8 @@
      :dependency-count (count dependencies)
      :dependent-count (count dependents)
      :instability (format "%.1f" instability)
-     :abstract-maybe? (if (empty? abstractions) "" "yes")}))
+     :abstract-maybe? (if (empty? abstractions) "" "yes")
+     :re-examine (flag-for-re-examine instability abstractions)}))
 
 (defn generate-deps-table [graph config]
   (->> (get-nodes graph config)
