@@ -1,9 +1,8 @@
 (ns leiningen.instability
   (:require [clojure.java.io               :refer [file]]
             [clojure.pprint                :refer [print-table]]
-            [clojure.tools.namespace.parse :refer [deps-from-ns-decl read-ns-decl]]
-            [clojure.tools.namespace.file  :refer [read-file-ns-decl]]
-            [clojure.tools.namespace.find  :refer [find-namespaces-in-dir find-ns-decls-in-dir]]
+            [clojure.tools.namespace.parse :refer [deps-from-ns-decl]]
+            [clojure.tools.namespace.find  :refer [find-ns-decls-in-dir]]
             [clojure.tools.namespace.dependency :refer [graph depend nodes
                                                         immediate-dependencies
                                                         transitive-dependencies
@@ -65,23 +64,19 @@
   (-> nodes
       wrap-filter))
 
-(defn graph-map [graph node config]
-  {:namespace (str node)
-   :transitive-dependencies (get-transitive-dependencies graph node config)
-   :immediate-dependencies (get-immediate-dependencies graph node config)
-   :transitive-dependents (get-transitive-dependents graph node config)
-   :immediate-dependents (get-immediate-dependents graph node config)})
+(defn get-dependencies [graph node config]
+  (if (:transitive config)
+    (get-transitive-dependencies graph node config)
+    (get-immediate-dependencies graph node config)))
 
-(defn create-graph-maps [graph config]
-  (reduce
-    (fn [maps node]
-      (conj maps (graph-map graph node config)))
-  []
-  (get-nodes graph config)))
+(defn get-dependents [graph node config]
+  (if (:transitive config)
+    (get-transitive-dependents graph node config)
+    (get-immediate-dependents graph node config)))
 
 (defn node-table-attributes [graph node config]
-  (let [dependencies (get-transitive-dependencies graph node config)
-        dependents (get-transitive-dependents graph node config)
+  (let [dependencies (get-dependencies graph node config)
+        dependents (get-dependents graph node config)
         instability (instability-score dependencies dependents)]
     {:namespace (str node)
      :dependency-count (count dependencies)
@@ -104,23 +99,39 @@
 (defn format-subtree [subtree prefix]
   (if (empty? subtree)
     ""
-    (apply str prefix (first subtree) "\n"
-           (map #(format-subtree %1 (str "\t" prefix)) (rest subtree)))))
+    (apply str prefix (format "[%s]" (first subtree)) "\n"
+           (map #(format-subtree %1 (str "  " prefix)) (rest subtree)))))
 
 (defn format-tree [tree]
-  (map #(format-subtree % "[") tree))
+  (map #(format-subtree % "") tree))
 
 (defn print-deps-tree [graph config]
   (->> (get-nodes graph config)
        (map #(node-tree graph % config))
        format-tree
-       (clojure.string/join "\n\n")
+       (clojure.string/join "\n")
        println))
 
+(defn get-config [project args]
+  (reduce
+    (fn [config key]
+      (assoc config key true))
+    {:lib-name (:name project)}
+    args))
+
+(defn show-options []
+  (println "OPTIONS\n:table\n:tree\n:external\n:transitive"))
+
 (defn instability [project & args]
-  (let [graph (create-graph "src")
-        config {:lib-name (:name project)}]
-    (print-deps-table graph config)
-    (println "\n----------------------\n")
-    (print-deps-tree graph config)))
+  (if (seq args)
+    (let [args (map read-string args)
+          config (get-config project args)
+          graph (create-graph "src")]
+      (when (:table config)
+        (print-deps-table graph config)
+        (println ""))
+      (when (:tree config)
+        (print-deps-tree graph config)
+        (println "")))
+    (show-options)))
 
