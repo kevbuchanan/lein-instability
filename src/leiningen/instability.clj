@@ -9,20 +9,33 @@
                                                         immediate-dependents
                                                         transitive-dependents]]))
 
-(defn instability-score [ce ca]
+(defn- instability-score [ce ca]
   (float (/ (count ce) (+ (count ca) (count ce)))))
 
-(defn filter-ns-decls [ns-syms library]
+(def ^:private abstractions #{"defprotocol" "defmulti" "geninterface"})
+
+(defn- make-file [ns-decl]
+  (-> (str "src/" ns-decl)
+      (clojure.string/replace "." "/")
+      (clojure.string/replace "-" "_")
+      (str ".clj")))
+
+(defn- find-abstractions [ns-decl]
+  (let [decl-as-file (make-file ns-decl)
+        code (try (slurp decl-as-file) (catch Exception e ""))]
+    (some #(re-find (re-pattern %) code) abstractions)))
+
+(defn- filter-ns-decls [ns-syms library]
   (filter #(re-find (re-pattern library) (str %)) ns-syms))
 
-(defn add-to-graph [graph ns-form ns-string]
+(defn- add-to-graph [graph ns-form ns-string]
   (reduce
     (fn [new-graph deps]
       (depend new-graph ns-form deps))
     graph
     (deps-from-ns-decl ns-string)))
 
-(defn create-graph [directory]
+(defn- create-graph [directory]
   (let [ns-strings (find-ns-decls-in-dir (file directory))]
     (reduce
       (fn [graph ns-string]
@@ -30,12 +43,12 @@
       (graph)
       ns-strings)))
 
-(defn filter-maybe [ns-decls config]
+(defn- filter-maybe [ns-decls config]
   (if (:external config)
     ns-decls
     (filter-ns-decls ns-decls (:lib-name config))))
 
-(defn wrap-filter [finder]
+(defn- wrap-filter [finder]
   (fn
     ([graph config]
       (-> (finder graph)
@@ -44,82 +57,84 @@
       (-> (finder graph node)
           (filter-maybe config)))))
 
-(def get-transitive-dependencies
+(def ^:private get-transitive-dependencies
   (-> transitive-dependencies
       wrap-filter))
 
-(def get-immediate-dependencies
+(def ^:private get-immediate-dependencies
   (-> immediate-dependencies
       wrap-filter))
 
-(def get-transitive-dependents
+(def ^:private get-transitive-dependents
   (-> transitive-dependents
       wrap-filter))
 
-(def get-immediate-dependents
+(def ^:private get-immediate-dependents
   (-> immediate-dependents
       wrap-filter))
 
-(def get-nodes
+(def ^:private get-nodes
   (-> nodes
       wrap-filter))
 
-(defn get-dependencies [graph node config]
+(defn- get-dependencies [graph node config]
   (if (:transitive config)
     (get-transitive-dependencies graph node config)
     (get-immediate-dependencies graph node config)))
 
-(defn get-dependents [graph node config]
+(defn- get-dependents [graph node config]
   (if (:transitive config)
     (get-transitive-dependents graph node config)
     (get-immediate-dependents graph node config)))
 
-(defn node-table-attributes [graph node config]
+(defn- node-table-attributes [graph node config]
   (let [dependencies (get-dependencies graph node config)
         dependents (get-dependents graph node config)
-        instability (instability-score dependencies dependents)]
+        instability (instability-score dependencies dependents)
+        abstractions (find-abstractions (str node))]
     {:namespace (str node)
      :dependency-count (count dependencies)
      :dependent-count (count dependents)
-     :instability (format "%.1f" instability)}))
+     :instability (format "%.1f" instability)
+     :abstract-maybe? (if (empty? abstractions) "" "yes")}))
 
-(defn print-deps-table [graph config]
+(defn- print-deps-table [graph config]
   (->> (get-nodes graph config)
        (map #(node-table-attributes graph % config))
        (sort-by :instability)
        print-table))
 
-(defn node-tree [graph node config]
+(defn- node-tree [graph node config]
   (reduce
     (fn [tree node]
       (conj tree (node-tree graph node config)))
     [(str node)]
     (get-immediate-dependencies graph node config)))
 
-(defn format-subtree [subtree prefix]
+(defn- format-subtree [subtree prefix]
   (if (empty? subtree)
     ""
     (apply str prefix (format "[%s]" (first subtree)) "\n"
            (map #(format-subtree %1 (str "  " prefix)) (rest subtree)))))
 
-(defn format-tree [tree]
+(defn- format-tree [tree]
   (map #(format-subtree % "") tree))
 
-(defn print-deps-tree [graph config]
+(defn- print-deps-tree [graph config]
   (->> (get-nodes graph config)
        (map #(node-tree graph % config))
        format-tree
        (clojure.string/join "\n")
        println))
 
-(defn get-config [project args]
+(defn- get-config [project args]
   (reduce
     (fn [config key]
       (assoc config key true))
     {:lib-name (:name project)}
     args))
 
-(defn show-options []
+(defn- show-options []
   (println "OPTIONS\n:table\n:tree\n:external\n:transitive"))
 
 (defn instability [project & args]
