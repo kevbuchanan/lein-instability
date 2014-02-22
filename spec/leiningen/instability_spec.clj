@@ -1,7 +1,5 @@
 (ns leiningen.instability-spec
   (require [speclj.core                  :refer :all]
-           [clojure.java.io              :refer [file]]
-           [clojure.tools.namespace.find :refer [find-ns-decls-in-dir]]
            [leiningen.instability        :refer :all]))
 
 (describe "lein instability"
