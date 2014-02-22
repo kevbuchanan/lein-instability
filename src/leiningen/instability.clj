@@ -91,7 +91,7 @@
   (let [dependencies (get-dependencies graph node config)
         dependents (get-dependents graph node config)
         instability (instability-score dependencies dependents)
-        abstractions (find-abstractions (str node))]
+        abstractions (find-abstractions node)]
     {:namespace (str node)
      :dependency-count (count dependencies)
      :dependent-count (count dependents)
@@ -109,13 +109,15 @@
     (fn [tree node]
       (conj tree (node-tree graph node config)))
     [(str node)]
-    (get-immediate-dependencies graph node config)))
+    (if (:dependents config)
+      (get-immediate-dependents graph node config)
+      (get-immediate-dependencies graph node config))))
 
 (defn- format-subtree [subtree prefix]
   (if (empty? subtree)
     ""
     (apply str prefix (format "[%s]" (first subtree)) "\n"
-           (map #(format-subtree %1 (str "  " prefix)) (rest subtree)))))
+           (map #(format-subtree %1 (str "->" prefix)) (rest subtree)))))
 
 (defn- format-tree [tree]
   (map #(format-subtree % "") tree))
