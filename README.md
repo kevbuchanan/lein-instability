@@ -10,5 +10,10 @@ $ lein install
 ```
 
 ```bash
-$ lein instability
+$ lein instability :table
 ```
+
+```bash
+$ lein instability :tree
+```
+
