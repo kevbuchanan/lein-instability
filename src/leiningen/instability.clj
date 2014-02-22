@@ -10,7 +10,10 @@
                                                         transitive-dependents]]))
 
 (defn- instability-score [ce ca]
-  (float (/ (count ce) (+ (count ca) (count ce)))))
+  (float
+    (try
+      (/ (count ce) (+ (count ca) (count ce)))
+      (catch Exception e 1))))
 
 (def ^:private abstractions #{"defprotocol" "defmulti" "geninterface"})
 
@@ -35,7 +38,7 @@
     graph
     (deps-from-ns-decl ns-string)))
 
-(defn- create-graph [directory]
+(defn create-graph [directory]
   (let [ns-strings (find-ns-decls-in-dir (file directory))]
     (reduce
       (fn [graph ns-string]
@@ -98,11 +101,10 @@
      :instability (format "%.1f" instability)
      :abstract-maybe? (if (empty? abstractions) "" "yes")}))
 
-(defn- print-deps-table [graph config]
+(defn generate-deps-table [graph config]
   (->> (get-nodes graph config)
        (map #(node-table-attributes graph % config))
-       (sort-by :instability)
-       print-table))
+       (sort-by :instability)))
 
 (defn- node-tree [graph node config]
   (reduce
@@ -122,12 +124,11 @@
 (defn- format-tree [tree]
   (map #(format-subtree % "") tree))
 
-(defn- print-deps-tree [graph config]
+(defn generate-deps-tree [graph config]
   (->> (get-nodes graph config)
        (map #(node-tree graph % config))
        format-tree
-       (clojure.string/join "\n")
-       println))
+       (clojure.string/join "\n")))
 
 (defn- get-config [project args]
   (reduce
@@ -145,10 +146,10 @@
           config (get-config project args)
           graph (create-graph "src")]
       (when (:table config)
-        (print-deps-table graph config)
+        (print-table (generate-deps-table graph config))
         (println ""))
       (when (:tree config)
-        (print-deps-tree graph config)
+        (println (generate-deps-tree graph config))
         (println "")))
     (show-options)))
 
