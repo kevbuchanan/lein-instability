@@ -145,8 +145,11 @@
     {:lib-name (:name project)}
     args))
 
-(defn- show-options []
-  (println "OPTIONS\n:table\n:tree\n:external\n:transitive"))
+(def ^:private options
+  "OPTIONS
+  :table - namespece instability table, add :transitive to count transitive dependencies\n
+  :tree - dependency tree, add :dependents for dependent tree\n
+  :external - include external library namespaces\n")
 
 (defn instability [project & args]
   (if (seq args)
@@ -159,5 +162,5 @@
       (when (:tree config)
         (println (generate-deps-tree graph config))
         (println "")))
-    (show-options)))
+    (println options)))
 
