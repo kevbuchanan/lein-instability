@@ -87,6 +87,32 @@
   (-> nodes
       wrap-filter))
 
+(defn- find-common-deps [graph node config]
+  (let [users (immediate-dependents graph node)
+        common (reduce
+                  (fn [all user]
+                    (apply conj all (get-immediate-dependencies graph user config)))
+                  []
+                  users)]
+    (reduce
+      (fn [tally other-node]
+        (assoc tally (str other-node) [(count (filter #{other-node} common)) (count users)]))
+      {}
+      (clojure.set/difference (set common) #{node}))))
+
+(defn- format-most-common [dep]
+  (when dep
+    (let [name (first dep)
+          numer (first (last dep))
+          denom (last (last dep))]
+      (str name ", " numer "/" denom))))
+
+(defn- most-common-dep [graph node config]
+  (->> (find-common-deps graph node config)
+       (sort-by #(/ (first (val %)) (last (val %))))
+       last
+       format-most-common))
+
 (defn- get-dependencies [graph node config]
   (if (:transitive config)
     (get-transitive-dependencies graph node config)
@@ -101,13 +127,15 @@
   (let [dependencies (get-dependencies graph node config)
         dependents (get-dependents graph node config)
         instability (instability-score dependencies dependents)
-        abstractions (find-abstractions node)]
+        abstractions (find-abstractions node)
+        most-common-dep (most-common-dep graph node config)]
     {:namespace (str node)
      :dependency-count (count dependencies)
      :dependent-count (count dependents)
      :instability (format "%.1f" instability)
      :abstract-maybe? (if (empty? abstractions) "" "yes")
-     :re-examine (flag-for-re-examine instability abstractions)}))
+     :re-examine (flag-for-re-examine instability abstractions)
+     :common-dep most-common-dep}))
 
 (defn generate-deps-table [graph config]
   (->> (get-nodes graph config)
