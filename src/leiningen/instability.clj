@@ -170,7 +170,7 @@
   (reduce
     (fn [config key]
       (assoc config key true))
-    {:lib-name (:name project)}
+    {:lib-name (:group project)}
     args))
 
 (def ^:private options
