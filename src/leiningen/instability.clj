@@ -107,11 +107,11 @@
           denom (last (last dep))]
       (str name ", " numer "/" denom))))
 
-(defn- most-common-dep [graph node config]
+(defn- most-common-deps [graph node config]
   (->> (find-common-deps graph node config)
        (sort-by #(/ (first (val %)) (last (val %))))
-       last
-       format-most-common))
+       reverse
+       (map format-most-common)))
 
 (defn- get-dependencies [graph node config]
   (if (:transitive config)
@@ -127,20 +127,29 @@
   (let [dependencies (get-dependencies graph node config)
         dependents (get-dependents graph node config)
         instability (instability-score dependencies dependents)
-        abstractions (find-abstractions node)
-        most-common-dep (most-common-dep graph node config)]
+        abstractions (find-abstractions node)]
     {:namespace (str node)
      :dependency-count (count dependencies)
      :dependent-count (count dependents)
      :instability (format "%.1f" instability)
      :abstract-maybe? (if (empty? abstractions) "" "yes")
-     :re-examine (flag-for-re-examine instability abstractions)
-     :common-dep most-common-dep}))
+     :re-examine (flag-for-re-examine instability abstractions)}))
 
 (defn generate-deps-table [graph config]
   (->> (get-nodes graph config)
        (map #(node-table-attributes graph % config))
        (sort-by :instability)))
+
+(defn- reuse-table-attributes [graph node config]
+  (let [most-common-deps (most-common-deps graph node config)]
+    {:namespace (str node)
+     :1 (first most-common-deps)
+     :2 (second most-common-deps)
+     :3 (nth most-common-deps 2 "")}))
+
+(defn generate-reuse-table [graph config]
+  (->> (get-nodes graph config)
+       (map #(reuse-table-attributes graph % config))))
 
 (defn- node-tree [graph node config]
   (reduce
@@ -189,6 +198,9 @@
         (println ""))
       (when (:tree config)
         (println (generate-deps-tree graph config))
+        (println ""))
+      (when (:reuse config)
+        (print-table (generate-reuse-table graph config))
         (println "")))
     (println options)))
 
