@@ -17,3 +17,7 @@ $ lein instability :table
 $ lein instability :tree
 ```
 
+```bash
+$ lein instability :reuse
+```
+
