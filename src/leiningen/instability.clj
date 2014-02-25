@@ -15,7 +15,7 @@
       (/ (count ce) (+ (count ca) (count ce)))
       (catch Exception e 1))))
 
-(def ^:private abstractions #{"defprotocol" "defmulti" "geninterface"})
+(def ^:private abstractions #{"defprotocol" "defmulti" "gen-interface"})
 
 (defn- make-file [ns-decl]
   (-> (str "src/" ns-decl)
